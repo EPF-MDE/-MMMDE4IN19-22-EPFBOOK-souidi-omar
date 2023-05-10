@@ -1,0 +1,27 @@
+<html>
+  <head>
+    <!--<link rel="stylesheet" href="/style.css"> -->
+    <style>
+      body {
+        background-color: blue;
+      }
+      main {
+        max-width: 800px;
+        margin: auto;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Students</h1>
+      <p class="long-text">
+        Luka Modrić, né le 9 septembre 1985 à Zadar en Croatie, est un footballeur international croate. Il joue au poste de milieu de terrain au Real Madrid. Il fait partie, avec Davor Šuker et Bernard Vukas, des plus grands joueurs croates de tous les temps. De surcroît, il est considéré comme l'un des plus grands milieux de terrain de l'histoire du football.
+      </p>
+      <ul>
+        <% students.forEach(function(student) { %>
+          <li><%= student.name %> | <%= student.school %></li>
+        <%})%>
+      </ul>
+    </main>
+  </body>
+</html>
