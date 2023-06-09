@@ -1,99 +1,233 @@
 const express = require("express");
-const app = express();
-const port = 3000;
 const fs = require("fs");
 const path = require("path");
 
-// Server setup
+const basicAuth = require("express-basic-auth");
+const bcrypt = require("bcrypt");
+
+const app = express();
+const axios = require('axios'); 
+app.get('/rickandmorty/character/:id', (req, res) => {
+  const characterId = req.params.id;
+  axios.get(`https://rickandmortyapi.com/api/character/${characterId}`)
+    .then(response => {
+      res.send(response.data);
+    })
+    .catch(error => {
+      console.log(error);
+      res.send('An error occurred: ' + error.message);
+    });
+});
+
+const port = 3000;
+
+// Server configuration
+// Enable JSON requests/responses
 app.use(express.json());
+// Enable form requests
 app.use(express.urlencoded({ extended: true }));
 
-// Use EJS templates
+// Enable EJS templates
 app.set("views", "./views");
 app.set("view engine", "ejs");
 
-// Serve static files (CSS, HTML, etc.)
+// Enable static files loading (like CSS files or even HTML)
 app.use(express.static("public"));
 
-// Serve HTML file
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "./views/home.html"));
-});
+// Enable cookie parsing (and writing)
+const cookieParser = require("cookie-parser");
+app.use(cookieParser());
 
-// Student model
-const getStudentsFromCsvfile = (cb) => {
+// Auth
+
+/**
+ * Basic authorizer for "express-basic-auth", storing users in a CSV file
+ *
+ * Read the password without encoding
+ */
+const clearPasswordAuthorizer = (username, password, cb) => {
+  // Parse the CSV file: this is very similar to parsing students!
+  parseCsvWithHeader("./users-clear.csv", (err, users) => {
+    console.log(users);
+    // Check that our current user belong to the list
+    const storedUser = users.find((possibleUser) => {
+      // NOTE: a simple comparison with === is possible but less safe
+      return basicAuth.safeCompare(username, possibleUser.username);
+    });
+    // NOTE: this is an example of using lazy evaluation of condition
+    if (!storedUser || !basicAuth.safeCompare(password, storedUser.password)) {
+      cb(null, false);
+    } else {
+      cb(null, true);
+    }
+  });
+};
+
+/**
+ * Authorizer function of basic auth, that handles encrypted passwords
+ * @param {*} username Provided username
+ * @param {*} password Provided password
+ * @param {*} cb (error, isAuthorized)
+ */
+const encryptedPasswordAuthorizer = (username, password, cb) => {
+  // Parse the CSV file: this is very similar to parsing students!
+  parseCsvWithHeader("./users.csv", (err, users) => {
+    // Check that our current user belong to the list
+    const storedUser = users.find((possibleUser) => {
+      // NOTE: a simple comparison with === is possible but less safe
+      return basicAuth.safeCompare(possibleUser.username, username);
+    });
+    // NOTE: this is an example of using lazy evaluation of condition
+    if (!storedUser) {
+      // username not found
+      cb(null, false);
+    } else {
+      // now we check the password
+      // bcrypt handles the fact that storedUser password is encrypted
+      // it is asynchronous, because this operation is long
+      // so we pass the callback as the last parameter
+      bcrypt.compare(password, storedUser.password, cb);
+    }
+  });
+};
+
+// Setup basic authentication
+app.use(
+  basicAuth({
+    // Basic hard-coded version:
+    //users: { admin: "supersecret" },
+    // From environment variables:
+    // users: { [process.env.ADMIN_USERNAME]: process.env.ADMIN_PASSWORD },
+    // Custom auth based on a file
+    //authorizer: clearPasswordAuthorizer,
+    // Final auth, based on a file with encrypted passwords
+    authorizer: encryptedPasswordAuthorizer,
+    // Our authorization schema needs to read a file: it is asynchronous
+    authorizeAsync: true,
+    challenge: true,
+  })
+);
+
+/**
+ * CSV parsing (for files with a header and 2 columns only)
+ *
+ * @example: "name,school\nOmar Souidi, EPF"
+ * => [{ name: "Omar Souidi", school: "EPF"}]
+ */
+const parseCsvWithHeader = (filepath, cb) => {
   const rowSeparator = "\n";
   const cellSeparator = ",";
-  fs.readFile("./students.csv", "utf8", (err, data) => {
-    if (err) {
-      return cb(err, null);
-    }
+  // example based on a CSV file
+  fs.readFile(filepath, "utf8", (err, data) => {
     const rows = data.split(rowSeparator);
+    // first row is an header I isolate it
     const [headerRow, ...contentRows] = rows;
     const header = headerRow.split(cellSeparator);
 
-    const students = contentRows.map((row) => {
+    const items = contentRows.map((row) => {
       const cells = row.split(cellSeparator);
-      const student = {
+      const item = {
         [header[0]]: cells[0],
         [header[1]]: cells[1],
       };
-      return student;
+      return item;
     });
-    return cb(null, students);
+    return cb(null, items);
   });
+};
+// Student model
+/**
+ * @param {*} cb A callback (err, students) => {...}
+ * that is called when we get the students
+ */
+const getStudentsFromCsvfile = (cb) => {
+  // example based on a CSV file
+  parseCsvWithHeader("./students.csv", cb);
 };
 
 const storeStudentInCsvFile = (student, cb) => {
   const csvLine = `\n${student.name},${student.school}`;
+  // Temporary log to check if our value is correct
+  // in the future, you might want to enable Node debugging
+  // https://code.visualstudio.com/docs/nodejs/nodejs-debugging
   console.log(csvLine);
   fs.writeFile("./students.csv", csvLine, { flag: "a" }, (err) => {
     cb(err, "ok");
   });
 };
 
-// User interface
+// UI
+// Serving some HTML as a file
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "./views/home.html"));
+});
+
+// A data visualization page with D3
+app.get("/students/data", (req, res) => {
+  res.render("students-data");
+});
+
 app.get("/students", (req, res) => {
   getStudentsFromCsvfile((err, students) => {
     if (err) {
       console.error(err);
-      return res.send("ERROR");
+      res.send("ERROR");
     }
     res.render("students", {
       students,
     });
   });
 });
+// Alternative without CSV
 app.get("/students-basic", (req, res) => {
   res.render("students", {
     students: [{ name: "Omar Souidi", school: "EPF" }],
   });
 });
+// A very simple page using an EJS template
+app.get("/students-no-data", (req, res) => {
+  res.render("students-no-data");
+});
+
+// Student create form
 app.get("/students/create", (req, res) => {
   res.render("create-student");
 });
-// Handle form submissions
+
+// Form handlers
 app.post("/students/create", (req, res) => {
   console.log(req.body);
   const student = req.body;
   storeStudentInCsvFile(student, (err, storeResult) => {
     if (err) {
-      console.error(err);
-      return res.status(500).send("error");
+      res.redirect("/students/create?error=1");
     } else {
-      return res.redirect("/students/create?created=1");
+      res.redirect("/students/create?created=1");
     }
   });
 });
 
 // JSON API
+
+// Not real login but just a demo of setting an auth token
+// using secure cookies
+app.post("/api/login", (req, res) => {
+  console.log("current cookies:", req.cookies);
+  // We assume that you check if the user can login based on "req.body"
+  // and then generate an authentication token
+  const token = "FOOBAR";
+  const tokenCookie = {
+    path: "/",
+    httpOnly: true,
+    expires: new Date(Date.now() + 60 * 60 * 1000),
+  };
+  res.cookie("auth-token", token, tokenCookie);
+  res.send("OK");
+});
+
 app.get("/api/students", (req, res) => {
   getStudentsFromCsvfile((err, students) => {
-    if (err) {
-      console.error(err);
-      return res.status(500).send("error");
-    }
-    return res.send(students);
+    res.send(students);
   });
 });
 
@@ -102,15 +236,16 @@ app.post("/api/students/create", (req, res) => {
   const student = req.body;
   storeStudentInCsvFile(student, (err, storeResult) => {
     if (err) {
-      console.error(err);
-      return res.status(500).send("error");
+      res.status(500).send("error");
     } else {
-      return res.send("ok");
+      res.send("ok");
     }
   });
 });
 
+
+
 app.listen(port, () => {
-  console.log(`App listening at http://localhost:${port}`);
+  console.log(`Example app listening at http://localhost:${port}`);
 });
 

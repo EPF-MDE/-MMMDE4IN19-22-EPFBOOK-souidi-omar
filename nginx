@@ -1,0 +1,9 @@
+server {
+    listen 80;
+    server_name p3000;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        include /etc/nginx/proxy_params;
+    }
+}
