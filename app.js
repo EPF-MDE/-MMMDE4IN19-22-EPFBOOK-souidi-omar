@@ -6,6 +6,8 @@ const basicAuth = require("express-basic-auth");
 const bcrypt = require("bcrypt");
 
 const app = express();
+
+
 const axios = require('axios'); 
 app.get('/rickandmorty/character/:id', (req, res) => {
   const characterId = req.params.id;
@@ -40,21 +42,17 @@ app.use(cookieParser());
 
 // Auth
 
-/**
- * Basic authorizer for "express-basic-auth", storing users in a CSV file
- *
- * Read the password without encoding
- */
+
 const clearPasswordAuthorizer = (username, password, cb) => {
   // Parse the CSV file: this is very similar to parsing students!
   parseCsvWithHeader("./users-clear.csv", (err, users) => {
     console.log(users);
     // Check that our current user belong to the list
     const storedUser = users.find((possibleUser) => {
-      // NOTE: a simple comparison with === is possible but less safe
+      
       return basicAuth.safeCompare(username, possibleUser.username);
     });
-    // NOTE: this is an example of using lazy evaluation of condition
+    
     if (!storedUser || !basicAuth.safeCompare(password, storedUser.password)) {
       cb(null, false);
     } else {
@@ -63,12 +61,7 @@ const clearPasswordAuthorizer = (username, password, cb) => {
   });
 };
 
-/**
- * Authorizer function of basic auth, that handles encrypted passwords
- * @param {*} username Provided username
- * @param {*} password Provided password
- * @param {*} cb (error, isAuthorized)
- */
+
 const encryptedPasswordAuthorizer = (username, password, cb) => {
   // Parse the CSV file: this is very similar to parsing students!
   parseCsvWithHeader("./users.csv", (err, users) => {
@@ -92,8 +85,8 @@ const encryptedPasswordAuthorizer = (username, password, cb) => {
 };
 
 // Setup basic authentication
-app.use(
-  basicAuth({
+//app.use(
+  //basicAuth({
     // Basic hard-coded version:
     //users: { admin: "supersecret" },
     // From environment variables:
@@ -101,12 +94,12 @@ app.use(
     // Custom auth based on a file
     //authorizer: clearPasswordAuthorizer,
     // Final auth, based on a file with encrypted passwords
-    authorizer: encryptedPasswordAuthorizer,
+    //authorizer: encryptedPasswordAuthorizer,
     // Our authorization schema needs to read a file: it is asynchronous
-    authorizeAsync: true,
-    challenge: true,
-  })
-);
+    //authorizeAsync: true,
+    //challenge: true,
+  //})
+//);
 
 /**
  * CSV parsing (for files with a header and 2 columns only)
@@ -120,7 +113,7 @@ const parseCsvWithHeader = (filepath, cb) => {
   // example based on a CSV file
   fs.readFile(filepath, "utf8", (err, data) => {
     const rows = data.split(rowSeparator);
-    // first row is an header I isolate it
+    
     const [headerRow, ...contentRows] = rows;
     const header = headerRow.split(cellSeparator);
 
@@ -135,11 +128,7 @@ const parseCsvWithHeader = (filepath, cb) => {
     return cb(null, items);
   });
 };
-// Student model
-/**
- * @param {*} cb A callback (err, students) => {...}
- * that is called when we get the students
- */
+
 const getStudentsFromCsvfile = (cb) => {
   // example based on a CSV file
   parseCsvWithHeader("./students.csv", cb);
@@ -147,9 +136,7 @@ const getStudentsFromCsvfile = (cb) => {
 
 const storeStudentInCsvFile = (student, cb) => {
   const csvLine = `\n${student.name},${student.school}`;
-  // Temporary log to check if our value is correct
-  // in the future, you might want to enable Node debugging
-  // https://code.visualstudio.com/docs/nodejs/nodejs-debugging
+  
   console.log(csvLine);
   fs.writeFile("./students.csv", csvLine, { flag: "a" }, (err) => {
     cb(err, "ok");
@@ -157,12 +144,11 @@ const storeStudentInCsvFile = (student, cb) => {
 };
 
 // UI
-// Serving some HTML as a file
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "./views/home.html"));
 });
 
-// A data visualization page with D3
+
 app.get("/students/data", (req, res) => {
   res.render("students-data");
 });
@@ -193,6 +179,8 @@ app.get("/students-no-data", (req, res) => {
 app.get("/students/create", (req, res) => {
   res.render("create-student");
 });
+
+
 
 // Form handlers
 app.post("/students/create", (req, res) => {
@@ -243,6 +231,31 @@ app.post("/api/students/create", (req, res) => {
   });
 });
 
+//Exercise 1 exam code 
+
+
+const csv = require('csv-parser');
+
+app.get('/students/:id', function (req, res) {
+    const id = req.params.id;
+    const students = [];
+
+    fs.createReadStream('students.csv')
+        .pipe(csv())
+        .on('data', (row) => {
+            students.push(row);
+        })
+        .on('end', () => {
+            // Use the ID as an index into the array
+            const student = students[id - 1]; // Subtract 1 because array indexing starts at 0
+
+            if (student) {
+                res.render('student_details', { student: student });
+            } else {
+                res.status(404).send('Student not found');
+            }
+        });
+});
 
 
 app.listen(port, () => {

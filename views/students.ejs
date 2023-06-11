@@ -1,15 +1,8 @@
+<!DOCTYPE html>
 <html>
   <head>
-    <!--<link rel="stylesheet" href="/style.css"> -->
-    <style>
-      body {
-        background-color: blue;
-      }
-      main {
-        max-width: 800px;
-        margin: auto;
-      }
-    </style>
+    <title>Students</title>
+    <link rel="stylesheet" href="style.css" />
   </head>
   <body>
     <main>
@@ -17,12 +10,13 @@
       <p class="long-text">
         Luka Modrić, né le 9 septembre 1985 à Zadar en Croatie, est un footballeur international croate. Il joue au poste de milieu de terrain au Real Madrid. Il fait partie, avec Davor Šuker et Bernard Vukas, des plus grands joueurs croates de tous les temps. De surcroît, il est considéré comme l'un des plus grands milieux de terrain de l'histoire du football.
       </p>
-      <ul id="students">
-        <% students.forEach(function(student) { %>
-          <li><%= student.name %> | <%= student.school %></li>
-        <%})%>
+      <ul>
+        <% students.forEach(function(student, index) { %>
+          <li>
+            <a href="/students/<%= index + 1 %>"><%= student.Name %> | <%= student.School %></a>
+          </li>
+        <% }) %>
       </ul>
-      <button id="test">Click me</button>
     </main>
 
     <script src="/students.js" type="text/javascript"></script>
